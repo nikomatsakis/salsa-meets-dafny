@@ -154,13 +154,13 @@ class Database {
     var changed_at: Revision := manifest.changed_at;
 
     result := [];
-    assert |result| <= |manifest.value|;
     for i := 0 to |manifest.value|
       invariant Valid() && InputsDon'tChange()
       invariant changed_at <= current_revision
       invariant |result| <= |manifest.value|
       invariant |old(result)| == i
       invariant |result| >= |old(result)|
+      invariant result <= GoldWholeProgram(manifest.value, source_texts)
     {
       var filename := manifest.value[i];
       var value := Ast(filename);
@@ -170,6 +170,7 @@ class Database {
       deps := deps + [Dependency.Ast(filename)];
       changed_at := min(changed_at, this.asts[filename].changed_at);
 
+      assert result <= GoldWholeProgram(manifest.value, source_texts);
       result := result + [value];
     }
 
