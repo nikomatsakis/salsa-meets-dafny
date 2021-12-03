@@ -113,7 +113,13 @@ class Database {
   method Ast(filename: Filename) returns (ast: Ast)
     requires Valid() && filename in manifest.value
     modifies this
-    ensures Valid() && InputsDon'tChange() && filename in asts.Keys
+    ensures (
+      Valid() && 
+      InputsDon'tChange() && 
+      filename in asts.Keys && 
+      ast == asts[filename].value &&
+      ast == GoldAst(source_texts, filename)
+    )
   {
     var old_memo: Option<Memo<Ast>> := None;
     if filename in asts.Keys {
@@ -148,20 +154,25 @@ class Database {
     var changed_at: Revision := manifest.changed_at;
 
     result := [];
+    assert |result| <= |manifest.value|;
     for i := 0 to |manifest.value|
       invariant Valid() && InputsDon'tChange()
       invariant changed_at <= current_revision
+      invariant |result| <= |manifest.value|
+      invariant |old(result)| == i
+      invariant |result| >= |old(result)|
     {
       var filename := manifest.value[i];
       var value := Ast(filename);
-
+      assert value == GoldAst(source_texts, filename);
+ 
       // record dependency:
       deps := deps + [Dependency.Ast(filename)];
       changed_at := min(changed_at, this.asts[filename].changed_at);
 
       result := result + [value];
     }
-    
+
     // Backdate if you have an old memo and it has not changed
     if whole_program.Some? && whole_program.value.value == result {
       changed_at := whole_program.value.changed_at;
