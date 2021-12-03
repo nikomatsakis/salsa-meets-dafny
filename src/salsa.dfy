@@ -5,15 +5,21 @@ datatype Ast = Const(int) | Plus(Ast, Ast)
 datatype Option<T> = None | Some(value: T)
 
 function GoldWholeProgram(manifest: seq<Filename>,
-                          source_text: map<Filename, Memo<string>>): seq<Ast>
-  requires forall f :: f in manifest ==> f in source_text.Keys
+                          source_texts: map<Filename, Memo<string>>): seq<Ast>
+  requires forall f :: f in manifest ==> f in source_texts.Keys
 {
   if manifest == [] then
     []
   else
     var file := manifest  [0];
-    var ast := Parse(source_text[file].value);
-    [ast] + GoldWholeProgram(manifest[1..], source_text)
+    var ast := GoldAst(source_texts, file);
+    [ast] + GoldWholeProgram(manifest[1..], source_texts)
+}
+
+function GoldAst(source_texts: map<Filename, Memo<string>>, filename: Filename): Ast
+requires filename in source_texts
+{
+    Parse(source_texts[filename].value)
 }
 
 function method Parse(source: string): Ast {
@@ -66,6 +72,12 @@ class Database {
           asts[filename].ValidAt(current_revision))
     && (whole_program == None ||
         whole_program.value.ValidAt(current_revision))
+    && (forall filename :: filename in asts.Keys && asts[filename].verified_at == current_revision ==>
+        filename in source_texts.Keys)
+    && (forall filename :: filename in asts.Keys && asts[filename].verified_at == current_revision ==>
+        asts[filename].value == GoldAst(source_texts, filename))
+    && (whole_program.Some? ==> whole_program.value.verified_at == current_revision ==>
+        GoldWholeProgram(manifest.value, source_texts) == whole_program.value.value)
   }
 
   twostate predicate InputsDon'tChange()
